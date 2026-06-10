@@ -110,15 +110,14 @@ class DMXController(QObject):
     def read_loop(self):
         while self.running:
             try:
-                # ENTTEC protocol frame start
                 start = self.serial_port.read(1)
-                if not start:
-                    continue
-
-                if start[0] != 0x7E:
+                if not start or start[0] != 0x7E:
                     continue
 
                 label = self.serial_port.read(1)
+                if not label or label[0] != 0x05:
+                    continue
+
                 length_l = self.serial_port.read(1)
                 length_h = self.serial_port.read(1)
 
@@ -129,21 +128,20 @@ class DMXController(QObject):
 
                 data = self.serial_port.read(length)
 
-                if len(data) < length:
-                    continue  # corrupted frame → skip
+                if len(data) != length:
+                    continue
 
-                self.serial_port.read(1)  # end byte
+                end = self.serial_port.read(1)
 
-                if label[0] == 0x05:
-                    # normalize to 512 channels
-                    if len(data) < 512:
-                        data = data + bytes(512 - len(data))
-                    else:
-                        data = data[:512]
+                if not end or end[0] != 0xE7:
+                    continue
 
-                dmx_values = list(data)
+                dmx_values = list(data[:512])
+
+                if len(dmx_values) < 512:
+                    dmx_values.extend([0] * (512 - len(dmx_values)))
+
                 self.dmx_frame_signal.emit(dmx_values)
-                self.last_frame_time = time.time()
                 
                 if not self.signal_active:
                     self.signal_active = True
@@ -277,8 +275,8 @@ class UiWindow(QMainWindow):
         if len(self.wached_channel_history) < 5:
             return
 
-        all_high = all(v > 150 for v in self.wached_channel_history)
-        all_low = all(v < 100 for v in self.wached_channel_history)
+        all_high = all(v > 250 for v in self.wached_channel_history)
+        all_low = all(v < 200 for v in self.wached_channel_history)
 
         if all_high and not self.is_video_playing:
             self.playVideo()
