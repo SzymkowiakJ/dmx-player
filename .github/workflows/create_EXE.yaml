@@ -24,7 +24,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          pyinstaller --onefile main.py
+          pyinstaller --onefile dmxPlayer.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
